@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">Restaurants</string>
+
+    <string name="action_picture">Show picture</string>
+    <string name="action_edit">Edit data</string>
+    <string name="action_add">Add new marker</string>
+
+    <string name="dialog_name">Name: </string>
+    <string name="dialog_address">Address: </string>
+    <string name="btnDialogSubmit">Submit</string>
+    <string name="btnDialogCancel">Cancel</string>
+    <string name="btnDialogTakePicture">Take picture</string>
+
+    <string name="btnDialogEdit">Edit data</string>
+
+
+    <string name="error_no_camera">Device unsupported.</string>
+
+
+    <string name="google_api_key">AIzaSyAZ3sTUVUdF5WfswJB6uKiTiKIa2hrJaVs</string>
+</resources>
