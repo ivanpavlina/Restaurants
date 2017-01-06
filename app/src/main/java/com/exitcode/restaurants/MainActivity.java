@@ -19,7 +19,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
-import android.support.v7.app.ActionBarActivity;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -36,27 +36,29 @@ import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
+import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.ResponseHandler;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.BasicResponseHandler;
-import org.apache.http.impl.client.DefaultHttpClient;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.List;
 
 
-public class MainActivity extends ActionBarActivity implements
+public class MainActivity extends AppCompatActivity implements
         GoogleApiClient.ConnectionCallbacks,
-        GoogleApiClient.OnConnectionFailedListener {
+        GoogleApiClient.OnConnectionFailedListener, OnMapReadyCallback {
 
     private static final String DEBUG_TAG = "debug_tag-0";
     private static final String DOWNLOAD_URL = "http://www.mocky.io/v2/54ef80f5a11ac4d607752717";
@@ -100,11 +102,7 @@ public class MainActivity extends ActionBarActivity implements
             finish();
         }
 
-        googleMap = ((MapFragment) getFragmentManager().findFragmentById(R.id.google_map)).getMap();
-        googleMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
-
-        CameraUpdate update = CameraUpdateFactory.newLatLngZoom(new LatLng(45.815011, 15.981919), 12);
-        googleMap.animateCamera(update);
+        ((MapFragment) getFragmentManager().findFragmentById(R.id.google_map)).getMapAsync(this);
 
         googleApiClient = new GoogleApiClient.Builder(this)
                 .addConnectionCallbacks(this)
@@ -118,30 +116,7 @@ public class MainActivity extends ActionBarActivity implements
         dialogEdit = new Dialog(this);
         dialogAdd = new Dialog(this);
 
-        googleMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
-            @Override
-            public boolean onMarkerClick(final Marker marker) {
-                lastSelection = marker.getTitle();
 
-                if (!menuIsShowing) {
-                    menuIsShowing = true;
-                    invalidateOptionsMenu();
-                }
-                return false;
-            }
-        });
-
-        googleMap.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
-            @Override
-            public void onMapClick(LatLng latLng) {
-                lastSelection = null;
-
-                if (menuIsShowing) {
-                    menuIsShowing = false;
-                    invalidateOptionsMenu();
-                }
-            }
-        });
     }
 
     @Override
@@ -149,12 +124,7 @@ public class MainActivity extends ActionBarActivity implements
         super.onResume();
         googleApiClient.connect();
 
-        SharedPreferences settings = getSharedPreferences(PREFS_NAME, 0);
-        if (settings.getBoolean(PREFS_KEY_DOWNLOAD_COMPLETE, false)) {
-            createMarkers();
-        } else {
-            new fetchParseJSON().execute();
-        }
+
     }
 
     @Override
@@ -579,6 +549,47 @@ public class MainActivity extends ActionBarActivity implements
         return new File(mediaStorageDir.getPath() + File.separator + name + ".jpg");
     }
 
+    @Override
+    public void onMapReady(GoogleMap googleMap) {
+        this.googleMap = googleMap;
+        googleMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
+
+        CameraUpdate update = CameraUpdateFactory.newLatLngZoom(new LatLng(45.815011, 15.981919), 12);
+        googleMap.animateCamera(update);
+
+        googleMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
+            @Override
+            public boolean onMarkerClick(final Marker marker) {
+                lastSelection = marker.getTitle();
+
+                if (!menuIsShowing) {
+                    menuIsShowing = true;
+                    invalidateOptionsMenu();
+                }
+                return false;
+            }
+        });
+
+        googleMap.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
+            @Override
+            public void onMapClick(LatLng latLng) {
+                lastSelection = null;
+
+                if (menuIsShowing) {
+                    menuIsShowing = false;
+                    invalidateOptionsMenu();
+                }
+            }
+        });
+
+        SharedPreferences settings = getSharedPreferences(PREFS_NAME, 0);
+        if (settings.getBoolean(PREFS_KEY_DOWNLOAD_COMPLETE, false)) {
+            createMarkers();
+        } else {
+            new fetchParseJSON().execute();
+        }
+    }
+
     public class fetchParseJSON extends AsyncTask<Void, Void, Boolean> {
 
         ProgressDialog progressDialog;
@@ -602,13 +613,23 @@ public class MainActivity extends ActionBarActivity implements
 
         @Override
         protected Boolean doInBackground(Void... params) {
+            InputStream in;
+            BufferedReader bufferedReader;
+            HttpURLConnection urlConnection = null;
+            StringBuilder result = new StringBuilder();
 
-            String result;
             try {
-                HttpClient Client = new DefaultHttpClient();
-                HttpGet httpGet = new HttpGet(DOWNLOAD_URL);
-                ResponseHandler<String> responseHandler = new BasicResponseHandler();
-                result = Client.execute(httpGet, responseHandler);
+                URL url = new URL(DOWNLOAD_URL);
+                urlConnection = (HttpURLConnection) url.openConnection();
+
+                in = new BufferedInputStream(urlConnection.getInputStream());
+                bufferedReader = new BufferedReader(new InputStreamReader(in));
+
+                String line;
+                while ((line = bufferedReader.readLine()) != null) {
+                    result.append(line).append('\n');
+                }
+
 
             } catch (IOException e) {
                 e.printStackTrace();
@@ -616,7 +637,7 @@ public class MainActivity extends ActionBarActivity implements
             }
 
             try {
-                JSONArray resultArray = new JSONArray(result);
+                JSONArray resultArray = new JSONArray(result.toString());
                 for (int i = 0; i < resultArray.length(); i++) {
                     JSONObject jsonObject = resultArray.getJSONObject(i);
                     String name = jsonObject.getString("Name");
